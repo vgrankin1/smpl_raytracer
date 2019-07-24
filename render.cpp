@@ -13,9 +13,9 @@ inline unsigned toColori(const uint8_t r, const uint8_t g, const uint8_t b, cons
 }
 inline unsigned toColor(const float r, const float g, const float b, const float a = 1.0)
 {
-	return toColori(255 * std::max(0.0f, std::min(1.0f, r)),
-					255 * std::max(0.0f, std::min(1.0f, g)), 
-					255 * std::max(0.0f, std::min(1.0f, b)));
+	return toColori(uint8_t(255 * std::max(0.0f, std::min(1.0f, r)) ),
+					uint8_t(255 * std::max(0.0f, std::min(1.0f, g)) ),
+					uint8_t(255 * std::max(0.0f, std::min(1.0f, b)) ));
 }
 inline unsigned toColor(const Vec3f &color)
 {
@@ -107,6 +107,13 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere> &s
 	for (size_t i = 0; i < lights.size(); i++)
 	{
 		Vec3f light_dir = (lights[i].position - point).normalize();
+		float light_distance = (lights[i].position - point).norm();
+
+		Vec3f shadow_orig = light_dir * N < 0 ? point - N * 1e-3f : point + N * 1e-3f; // checking if the point lies in the shadow of the lights[i]
+		Vec3f shadow_pt, shadow_N;
+		Material tmpmaterial;
+		if (scene_intersect(shadow_orig, light_dir, spheres, shadow_pt, shadow_N, tmpmaterial) && (shadow_pt - shadow_orig).norm() < light_distance)
+			continue;
 		diffuse_light_intensity += lights[i].intensity * std::max(0.f, light_dir * N);
 		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i].intensity;
 	}
@@ -115,10 +122,10 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere> &s
 
 
 
-const float fov = M_PI / 2.f;
+const float fov = float(M_PI) / 2.f;
 
-Material      ivory(Vec2f(0.6, 0.3), Vec3f(0.4f, 0.4f, 0.3f), 50);
-Material red_rubber(Vec2f(0.9, 0.1), Vec3f(0.3f, 0.1f, 0.1f), 10);
+Material      ivory(Vec2f(0.6f, 0.3f), Vec3f(0.4f, 0.4f, 0.3f), 50.0f);
+Material red_rubber(Vec2f(0.9f, 0.1f), Vec3f(0.3f, 0.1f, 0.1f), 10.0f);
 
 
 
@@ -132,9 +139,9 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, ivory));
 
 	std::vector<Light>  lights;
-	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
-	lights.push_back(Light(Vec3f(30, 50, -25), 1.8));
-	lights.push_back(Light(Vec3f(30, 20, 30), 1.7));
+	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5f));
+	lights.push_back(Light(Vec3f(30, 50, -25), 1.8f));
+	lights.push_back(Light(Vec3f(30, 20, 30), 1.7f));
 
 	for (size_t j = 0; j < height; j++)
 	{
