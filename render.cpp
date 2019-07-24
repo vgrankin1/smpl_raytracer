@@ -13,7 +13,7 @@ inline unsigned toColori(const uint8_t r, const uint8_t g, const uint8_t b, cons
 }
 inline unsigned toColor(const float r, const float g, const float b, const float a = 1.0)
 {
-	return toColori(255 * std::max(0.0f, std::min(1.0f, r)), 
+	return toColori(255 * std::max(0.0f, std::min(1.0f, r)),
 					255 * std::max(0.0f, std::min(1.0f, g)), 
 					255 * std::max(0.0f, std::min(1.0f, b)));
 }
@@ -31,11 +31,22 @@ struct Light
 	float intensity;
 };
 
+/*
+Material(const Vec2f& a, const Vec3f& color, const float& spec) : albedo(a), diffuse_color(color), specular_exponent(spec) {}
+Material() : albedo(1, 0), diffuse_color(), specular_exponent() {}
+Vec2f albedo;
+Vec3f diffuse_color;
+float specular_exponent;*/
+
+
 struct Material
 {
-	Material(const Vec3f& color) : diffuse_color(color) {}
-	Material() : diffuse_color() {}
-	Vec3f diffuse_color;
+	Material(const Vec2f &albedo, const Vec3f& diffuse, const float specular) 
+			: albedo(albedo), diffuse(diffuse), specular_exponent(specular) {}
+	Material() : albedo(1, 0), diffuse(), specular_exponent() {}
+	Vec2f albedo;
+	Vec3f diffuse;//diffuse color
+	float specular_exponent;
 };
 
 struct Sphere
@@ -62,6 +73,11 @@ struct Sphere
 	}
 };
 
+Vec3f reflect(const Vec3f& I, const Vec3f& N)
+{
+	return I - N * 2.f * (I * N);
+}
+
 bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material &material)
 {
 	float spheres_dist = std::numeric_limits<float>::max();
@@ -87,22 +103,22 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere> &s
 		return Vec3f(0.2f, 0.7f, 0.8f); // background color
 	}
 
-	float diffuse_light_intensity = 0;
+	float diffuse_light_intensity = 0, specular_light_intensity = 0;
 	for (size_t i = 0; i < lights.size(); i++)
 	{
 		Vec3f light_dir = (lights[i].position - point).normalize();
 		diffuse_light_intensity += lights[i].intensity * std::max(0.f, light_dir * N);
+		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i].intensity;
 	}
-	Vec3f col = material.diffuse_color * diffuse_light_intensity;
-	return material.diffuse_color * diffuse_light_intensity;
+	return material.diffuse * diffuse_light_intensity * material.albedo[0] + Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1];
 }
 
 
 
 const float fov = M_PI / 2.f;
 
-Material      ivory(Vec3f(0.4f, 0.4f, 0.3f));
-Material red_rubber(Vec3f(0.3f, 0.1f, 0.1f));
+Material      ivory(Vec2f(0.6, 0.3), Vec3f(0.4f, 0.4f, 0.3f), 50);
+Material red_rubber(Vec2f(0.9, 0.1), Vec3f(0.3f, 0.1f, 0.1f), 10);
 
 
 
@@ -117,13 +133,15 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 
 	std::vector<Light>  lights;
 	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
+	lights.push_back(Light(Vec3f(30, 50, -25), 1.8));
+	lights.push_back(Light(Vec3f(30, 20, 30), 1.7));
 
 	for (size_t j = 0; j < height; j++)
 	{
 		for (size_t i = 0; i < width; i++)
 		{
-			float x = (2 * (i + 0.5) / (float)width - 1) * tan(fov / 2.) * width / (float)height;
-			float y = -(2 * (j + 0.5) / (float)height - 1) * tan(fov / 2.);
+			float x = (2 * (i + 0.5f) / float(width) - 1 ) * tan(fov / 2.0f) * width / float(height);
+			float y =-(2 * (j + 0.5f) / float(height) - 1 ) * tan(fov / 2.0f);
 			Vec3f dir = Vec3f(x, y, -1).normalize();
 			framebuffer[i + j * width] = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
 		}
