@@ -2,21 +2,34 @@
 #define _USE_MATH_DEFINES
 
 #include <cmath>
+#include <algorithm>
 #include "geometry.h"
 
 
-unsigned toColor(const float r, const float g, const float b, const float a = 1.0)
-{
-	return unsigned(r * 255 * 256 * 256 * 256) + unsigned(g * 255 * 256 * 256) + unsigned(b * 255 * 256) + unsigned(a * 255.0);
-}
-unsigned toColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a = 255)
+
+inline unsigned toColori(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a = 255)
 {
 	return (r << 24) + (g << 16) + (b << 8) + a;
 }
-unsigned toColor(const Vec3f& color)
+inline unsigned toColor(const float r, const float g, const float b, const float a = 1.0)
 {
-	return toColor(color.x, color.y, color.z);
+	return toColori(255 * std::max(0.0f, std::min(1.0f, r)), 
+					255 * std::max(0.0f, std::min(1.0f, g)), 
+					255 * std::max(0.0f, std::min(1.0f, b)));
 }
+inline unsigned toColor(const Vec3f &color)
+{
+	return toColor(color.r, color.g, color.b);
+}
+
+
+struct Light
+{
+	Light(const Vec3f &position, const float& intensity)
+		: position(position), intensity(intensity) {}
+	Vec3f position;
+	float intensity;
+};
 
 struct Material
 {
@@ -31,8 +44,8 @@ struct Sphere
 	float r;
 	Material material;
 
-	Sphere(const Vec3f &center, const float &radius, const Material &material)
-		: p(center), r(radius), material(material) {}
+	Sphere(const Vec3f &position, const float &radius, const Material &material)
+		: p(position), r(radius), material(material) {}
 
 	bool ray_intersect(const Vec3f& orig, const Vec3f& dir, float& t0) const
 	{
@@ -64,24 +77,32 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphe
 	return spheres_dist < 1000;
 }
 
-Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere> &spheres)
+Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
 {
 	Vec3f point, N;
 	Material material;
 
 	if (!scene_intersect(orig, dir, spheres, point, N, material))
 	{
-		return Vec3f(0.2, 0.7, 0.8); // background color
+		return Vec3f(0.2f, 0.7f, 0.8f); // background color
 	}
-	return material.diffuse_color;
+
+	float diffuse_light_intensity = 0;
+	for (size_t i = 0; i < lights.size(); i++)
+	{
+		Vec3f light_dir = (lights[i].position - point).normalize();
+		diffuse_light_intensity += lights[i].intensity * std::max(0.f, light_dir * N);
+	}
+	Vec3f col = material.diffuse_color * diffuse_light_intensity;
+	return material.diffuse_color * diffuse_light_intensity;
 }
 
 
 
-const int fov = M_PI / 2.;
+const float fov = M_PI / 2.f;
 
-Material      ivory(Vec3f(0.4, 0.4, 0.3));
-Material red_rubber(Vec3f(0.3, 0.1, 0.1));
+Material      ivory(Vec3f(0.4f, 0.4f, 0.3f));
+Material red_rubber(Vec3f(0.3f, 0.1f, 0.1f));
 
 
 
@@ -94,6 +115,9 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
 	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, ivory));
 
+	std::vector<Light>  lights;
+	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
+
 	for (size_t j = 0; j < height; j++)
 	{
 		for (size_t i = 0; i < width; i++)
@@ -101,7 +125,7 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 			float x = (2 * (i + 0.5) / (float)width - 1) * tan(fov / 2.) * width / (float)height;
 			float y = -(2 * (j + 0.5) / (float)height - 1) * tan(fov / 2.);
 			Vec3f dir = Vec3f(x, y, -1).normalize();
-			framebuffer[i + j * width] = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres));
+			framebuffer[i + j * width] = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
 		}
 	}
 }

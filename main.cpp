@@ -12,7 +12,7 @@
 #pragma comment(lib, "../SDL2-devel-2.0.9-VC/lib/x64/SDL2.lib")
 #pragma comment(lib, "../SDL2-devel-2.0.9-VC/lib/x64/SDL2main.lib")
 
-#pragma warning( disable : 26451 )
+//#pragma warning( disable : 26451 )
 #endif
 
 
