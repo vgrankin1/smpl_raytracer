@@ -5,6 +5,10 @@
 #include <chrono>
 
 #include "geometry.h"
+#include "util.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #if _MSC_VER
 #include "SDL2-devel-2.0.9-VC/include/SDL.h"
@@ -25,7 +29,7 @@ struct sdl_window_t
 	int width, height;
 };
 
-void render(std::vector<unsigned>& framebuffer, const int width, const int height);
+void render(std::vector<unsigned>& framebuffer, const int width, const int height, std::vector<Vec3f> *envmap, const int env_width, const int env_height);
 
 int main()
 {
@@ -40,6 +44,30 @@ int main()
 	std::vector<unsigned> framebuffer(mainWindow.width*mainWindow.height);
 
 	
+	std::vector<Vec3f> envmap;
+	int envmap_width, envmap_height;
+	int n = 0;
+	unsigned char* pixmap = stbi_load("../envmap.jpg", &envmap_width, &envmap_height, &n, 0);
+	if (!pixmap || 3 != n) {
+		std::cerr << "Error: can not load the environment map" << std::endl;
+		return -1;
+	}
+	envmap = std::vector<Vec3f>(envmap_width * envmap_height);
+	/*for (int j = envmap_height; j--;)
+	{
+		for (int i = 0; i < envmap_width; i++) {
+			envmap[i + j * envmap_width] = Vec3f(pixmap[3 * (i + j * envmap_width) + 0], pixmap[3*(i + j * envmap_width) + 1], pixmap[3*(i + j * envmap_width) + 2]) * (1 / 255.);
+		}
+	}*/
+	for (int j = envmap_height - 1; j >= 0; j--) {
+		for (int i = 0; i < envmap_width; i++) {
+			envmap[i + j * envmap_width] = Vec3f(pixmap[(i + j * envmap_width) * 3 + 0], pixmap[(i + j * envmap_width) * 3 + 1], pixmap[(i + j * envmap_width) * 3 + 2]) * (1.f / 255.f);
+		}
+	}
+	stbi_image_free(pixmap);
+
+
+
 	if (SDL_Init(SDL_INIT_VIDEO))
 	{
 		std::cerr << "Couldn't initialize SDL: " << SDL_GetError() << std::endl;
@@ -61,6 +89,17 @@ int main()
 			framebuffer[i * mainWindow.width + j] = toColor(255*j / mainWindow.width, 255 - 255*i/ mainWindow.height, 0, (uint8_t)255);
 		}
 	}/**/
+	/*
+	for (int i = 0, ii = 2000; i < mainWindow.height; i++)
+	{
+		
+		for (int j = 0, jj = 0000; j < mainWindow.width; j++)
+		{
+			framebuffer[i * mainWindow.width + j] = toColori(pixmap[3 * (ii * envmap_width + jj) + 0], pixmap[3*(ii * envmap_width + jj) + 1], pixmap[3*(ii * envmap_width + jj) + 2]);
+			jj++;
+		}
+		ii++;
+	}/**/
 	for (uint64_t frame_cnt = 0; ; frame_cnt++)
 	{
 		tp_begin = std::chrono::high_resolution_clock::now();
@@ -69,7 +108,7 @@ int main()
 			break;
 		}
 
-		render(framebuffer, mainWindow.width, mainWindow.height);
+		render(framebuffer, mainWindow.width, mainWindow.height, &envmap, envmap_width, envmap_height);
 
 		SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width*4 );
 
