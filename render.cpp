@@ -1,64 +1,26 @@
-
 #define _USE_MATH_DEFINES
 
 #include <cmath>
 #include <algorithm>
-#include "geometry.h"
-#include "util.h"
+#include "geometry.hpp"
+#include "util.hpp"
 
 
 
 
-struct Light
+bool Sphere::ray_intersect(const Vec3f& orig, const Vec3f& dir, float& t0) const
 {
-	Light(const Vec3f &position, const float& intensity)
-		: position(position), intensity(intensity) {}
-	Vec3f position;
-	float intensity;
-};
-
-/*
-Material(const Vec2f& a, const Vec3f& color, const float& spec) : albedo(a), diffuse_color(color), specular_exponent(spec) {}
-Material() : albedo(1, 0), diffuse_color(), specular_exponent() {}
-Vec2f albedo;
-Vec3f diffuse_color;
-float specular_exponent;*/
-
-
-struct Material
-{
-	Material(const Vec4f &albedo, const Vec3f& diffuse, const float specular, const float refractive) 
-			: albedo(albedo), diffuse(diffuse), specular_exponent(specular), refractive(refractive) {}
-	Material() : albedo(1, 0, 0, 0), diffuse(), specular_exponent(), refractive() {}
-	Vec4f albedo;
-	Vec3f diffuse;//diffuse color
-	float specular_exponent;
-	float refractive;// refractive index
-};
-
-struct Sphere
-{
-	Vec3f p;
-	float r;
-	Material material;
-
-	Sphere(const Vec3f &position, const float &radius, const Material &material)
-		: p(position), r(radius), material(material) {}
-
-	bool ray_intersect(const Vec3f& orig, const Vec3f& dir, float &t0) const
-	{
-		Vec3f L = p - orig;
-		float tca = L * dir;
-		float d2 = L * L - tca * tca;
-		if (d2 > r * r) return false;
-		float thc = sqrtf(r * r - d2);
-		t0 = tca - thc;
-		float t1 = tca + thc;
-		if (t0 < 0) t0 = t1;
-		if (t0 < 0) return false;
-		return true;
-	}
-};
+	Vec3f L = position - orig;
+	float tca = L * dir;
+	float d2 = L * L - tca * tca;
+	if (d2 > r * r) return false;
+	float thc = sqrtf(r * r - d2);
+	t0 = tca - thc;
+	float t1 = tca + thc;
+	if (t0 < 0) t0 = t1;
+	if (t0 < 0) return false;
+	return true;
+}
 
 Vec3f reflect(const Vec3f& I, const Vec3f& N)
 {
@@ -83,7 +45,7 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphe
 		if (spheres[i].ray_intersect(orig, dir, dist_i) && dist_i < spheres_dist) {
 			spheres_dist = dist_i;
 			hit = orig + dir * dist_i;
-			N = (hit - spheres[i].p).normalize();
+			N = (hit - spheres[i].position).normalize();
 			material = spheres[i].material;
 		}
 	}
@@ -102,38 +64,10 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphe
 	return std::min(spheres_dist, checkerboard_dist) < 1000;
 }
 
-
-bool scene_intersect1(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material& material) {
-	float spheres_dist = std::numeric_limits<float>::max();
-	for (size_t i = 0; i < spheres.size(); i++) {
-		float dist_i;
-		if (spheres[i].ray_intersect(orig, dir, dist_i) && dist_i < spheres_dist) {
-			spheres_dist = dist_i;
-			hit = orig + dir * dist_i;
-			N = (hit - spheres[i].p).normalize();
-			material = spheres[i].material;
-		}
-	}
-
-	float checkerboard_dist = std::numeric_limits<float>::max();
-	if (fabs(dir.y) > 1e-3) {
-		float d = -(orig.y + 4) / dir.y; // the checkerboard plane has equation y = -4
-		Vec3f pt = orig + dir * d;
-		if (d > 0 && fabs(pt.x) < 10 && pt.z<-10 && pt.z>-30 && d < spheres_dist) {
-			checkerboard_dist = d;
-			hit = pt;
-			N = Vec3f(0, 1, 0);
-			material.diffuse = (int(.5 * hit.x + 1000) + int(.5 * hit.z)) & 1 ? Vec3f(1, 1, 1) : Vec3f(1, .7, .3);
-			material.diffuse = material.diffuse * .3;
-		}
-	}
-	return std::min(spheres_dist, checkerboard_dist) < 1000;
-}
-
-std::vector<Vec3f> *envmap;
+const std::vector<Vec3f> *envmap;
 uint32_t envmap_width, envmap_height;
 
-Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, const std::vector<Light>& lights, size_t depth = 0)
+Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, const std::vector<Light_t>& lights, size_t depth = 0)
 {
 	Vec3f point, N;
 	Material material;
@@ -168,12 +102,12 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& s
 		if (scene_intersect(shadow_orig, light_dir, spheres, shadow_pt, shadow_N, tmpmaterial) && (shadow_pt - shadow_orig).norm() < light_distance)
 			continue;
 
-
 		diffuse_light_intensity += lights[i].intensity * std::max(0.f, light_dir * N);
 		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i].intensity;
 	}
 
-	return material.diffuse * diffuse_light_intensity * material.albedo[0] + Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1] +
+	return material.diffuse * diffuse_light_intensity * material.albedo[0] + 
+		Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1] +
 		reflect_color * material.albedo[2] + refract_color * material.albedo[3];
 }
 
@@ -185,7 +119,7 @@ Material     mirror(Vec4f(0.0f, 10.0f, 0.8f, 0.0f), Vec3f(1.0f, 1.0f, 1.0f), 142
 Material      glass(Vec4f(0.0, 0.5, 0.1, 0.8), Vec3f(0.6, 0.7, 0.8), 125., 1.5);
 
 
-void render(std::vector<unsigned>& framebuffer, const int width, const int height, std::vector<Vec3f> *envmap, const int env_width, const int env_height)
+void render(std::vector<unsigned>& framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, const int env_width, const int env_height)
 {
 	::envmap = envmap;
 	::envmap_width = env_width;
@@ -197,10 +131,10 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
 	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, mirror));
 
-	std::vector<Light>  lights;
-	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5f));
-	lights.push_back(Light(Vec3f(30, 50, -25), 1.8f));
-	lights.push_back(Light(Vec3f(30, 20, 30), 1.7f));
+	std::vector<Light_t> lights;
+	lights.push_back(Light_t(Vec3f(-20, 20, 20), 1.5f) );
+	lights.push_back(Light_t(Vec3f(30, 50, -25), 1.8f) );
+	lights.push_back(Light_t(Vec3f(30, 20, 30), 1.7f) );
 
 	for (size_t j = 0; j < height; j++)
 	{
@@ -213,3 +147,9 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 		}
 	}
 }
+
+/*
+std::vector<uint64_t> render2(const int width, const int height )
+{
+
+}*/

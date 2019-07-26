@@ -3,9 +3,11 @@
 #include <vector>
 
 #include <chrono>
+#include <thread>
+#include <mutex>
 
-#include "geometry.h"
-#include "util.h"
+#include "geometry.hpp"
+#include "util.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -29,7 +31,10 @@ struct sdl_window_t
 	int width, height;
 };
 
-void render(std::vector<unsigned>& framebuffer, const int width, const int height, std::vector<Vec3f> *envmap, const int env_width, const int env_height);
+void render(std::vector<unsigned>& framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, const int env_width, const int env_height);
+
+std::thread threads[10];
+std::mutex mtx1;
 
 int main()
 {
@@ -44,6 +49,24 @@ int main()
 	std::vector<unsigned> framebuffer(mainWindow.width*mainWindow.height);
 
 	
+	/*
+	auto func = [](const std::string& first, const std::string& second)
+	{
+		std::cout << first << second;
+	};
+	std::thread thread(func, "Hello, ", "threads!");
+	
+	std::cout << "\njoinable: " << thread.joinable() << std::endl;
+	std::this_thread::sleep_for(std::chrono::seconds(4));
+	std::cout << "joinable: " << thread.joinable() << std::endl;
+
+	thread.join();
+	std::cout << "joinable: " << thread.joinable() << std::endl;*/
+
+
+
+
+
 	std::vector<Vec3f> envmap;
 	int envmap_width, envmap_height;
 	int n = 0;
@@ -108,9 +131,23 @@ int main()
 			break;
 		}
 
-		render(framebuffer, mainWindow.width, mainWindow.height, &envmap, envmap_width, envmap_height);
+		auto render_thread = [](std::vector<unsigned> *framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, int envmap_width, int envmap_height)
+		{
+			mtx1.lock();
+			render(*framebuffer, width, height, envmap, envmap_width, envmap_height);
+			mtx1.unlock();
+		};
 
-		SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width*4 );
+		if (mtx1.try_lock())
+		{
+			SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width * 4);
+			if (threads[0].joinable())
+				threads[0].join();
+			for (int i = 0; i < 1; ++i)
+				threads[i] = std::thread(render_thread, &framebuffer, mainWindow.width, mainWindow.height, &envmap, envmap_width, envmap_height);
+			mtx1.unlock();
+		}
+		
 
 		SDL_RenderClear(mainWindow.renderer);
 		SDL_RenderCopy(mainWindow.renderer, mainWindow.framebuffer, NULL, NULL);
