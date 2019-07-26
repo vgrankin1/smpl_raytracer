@@ -22,6 +22,9 @@
 #endif
 
 
+
+
+
 struct sdl_window_t
 {
 	SDL_Window *window;
@@ -31,7 +34,7 @@ struct sdl_window_t
 	int width, height;
 };
 
-void render(std::vector<unsigned>& framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, const int env_width, const int env_height);
+void render(std::vector<unsigned>& framebuffer, const int width, const int height, const unsigned char *envmap, const int env_width, const int env_height);//const std::vector<Vec3f> *envmap
 
 std::thread threads[10];
 std::mutex mtx1;
@@ -48,7 +51,7 @@ int main()
 
 	std::vector<unsigned> framebuffer(mainWindow.width*mainWindow.height);
 
-	
+
 	/*
 	auto func = [](const std::string& first, const std::string& second)
 	{
@@ -63,11 +66,6 @@ int main()
 	thread.join();
 	std::cout << "joinable: " << thread.joinable() << std::endl;*/
 
-
-
-
-
-	std::vector<Vec3f> envmap;
 	int envmap_width, envmap_height;
 	int n = 0;
 	unsigned char* pixmap = stbi_load("../envmap.jpg", &envmap_width, &envmap_height, &n, 0);
@@ -75,21 +73,6 @@ int main()
 		std::cerr << "Error: can not load the environment map" << std::endl;
 		return -1;
 	}
-	envmap = std::vector<Vec3f>(envmap_width * envmap_height);
-	/*for (int j = envmap_height; j--;)
-	{
-		for (int i = 0; i < envmap_width; i++) {
-			envmap[i + j * envmap_width] = Vec3f(pixmap[3 * (i + j * envmap_width) + 0], pixmap[3*(i + j * envmap_width) + 1], pixmap[3*(i + j * envmap_width) + 2]) * (1 / 255.);
-		}
-	}*/
-	for (int j = envmap_height - 1; j >= 0; j--) {
-		for (int i = 0; i < envmap_width; i++) {
-			envmap[i + j * envmap_width] = Vec3f(pixmap[(i + j * envmap_width) * 3 + 0], pixmap[(i + j * envmap_width) * 3 + 1], pixmap[(i + j * envmap_width) * 3 + 2]) * (1.f / 255.f);
-		}
-	}
-	stbi_image_free(pixmap);
-
-
 
 	if (SDL_Init(SDL_INIT_VIDEO))
 	{
@@ -101,28 +84,9 @@ int main()
 		std::cerr << "Couldn't create window and renderer: " << SDL_GetError() << std::endl;
 		return -1;
 	}
-
 	mainWindow.framebuffer = SDL_CreateTexture(mainWindow.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, mainWindow.width, mainWindow.height);
 
-	/*
-	for (int i = 0; i < mainWindow.height; i++)
-	{
-		for (int j = 0; j < mainWindow.width; j++)
-		{
-			framebuffer[i * mainWindow.width + j] = toColor(255*j / mainWindow.width, 255 - 255*i/ mainWindow.height, 0, (uint8_t)255);
-		}
-	}/**/
-	/*
-	for (int i = 0, ii = 2000; i < mainWindow.height; i++)
-	{
-		
-		for (int j = 0, jj = 0000; j < mainWindow.width; j++)
-		{
-			framebuffer[i * mainWindow.width + j] = toColori(pixmap[3 * (ii * envmap_width + jj) + 0], pixmap[3*(ii * envmap_width + jj) + 1], pixmap[3*(ii * envmap_width + jj) + 2]);
-			jj++;
-		}
-		ii++;
-	}/**/
+
 	for (uint64_t frame_cnt = 0; ; frame_cnt++)
 	{
 		tp_begin = std::chrono::high_resolution_clock::now();
@@ -131,7 +95,7 @@ int main()
 			break;
 		}
 
-		auto render_thread = [](std::vector<unsigned> *framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, int envmap_width, int envmap_height)
+		auto render_thread = [](std::vector<unsigned> *framebuffer, const int width, const int height, const unsigned char*envmap, int envmap_width, int envmap_height)
 		{
 			mtx1.lock();
 			render(*framebuffer, width, height, envmap, envmap_width, envmap_height);
@@ -144,7 +108,7 @@ int main()
 			if (threads[0].joinable())
 				threads[0].join();
 			for (int i = 0; i < 1; ++i)
-				threads[i] = std::thread(render_thread, &framebuffer, mainWindow.width, mainWindow.height, &envmap, envmap_width, envmap_height);
+				threads[i] = std::thread(render_thread, &framebuffer, mainWindow.width, mainWindow.height, pixmap, envmap_width, envmap_height);
 			mtx1.unlock();
 		}
 		
@@ -167,6 +131,8 @@ int main()
 	SDL_DestroyRenderer(mainWindow.renderer);
 	SDL_DestroyWindow(mainWindow.window);
 	SDL_Quit();
+
+	stbi_image_free(pixmap);
 	return 0;
 }
 

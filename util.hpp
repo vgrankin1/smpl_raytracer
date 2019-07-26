@@ -4,6 +4,15 @@
 #include <algorithm>
 #include "geometry.hpp"
 
+union unColor_t
+{
+	struct
+	{
+		uint8_t a, b, g, r;
+	}c;
+	uint32_t color;
+};
+
 inline unsigned toColori(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a = 255)
 {
 	return (r << 24) + (g << 16) + (b << 8) + a;
@@ -61,9 +70,9 @@ public:
 
 
 
-struct Scene_t
+class Scene_t
 {
-
+public:
 	const std::vector<Vec3f>* envmap;
 	uint32_t envmap_width, envmap_height;
 };

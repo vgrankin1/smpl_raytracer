@@ -5,7 +5,9 @@
 #include "geometry.hpp"
 #include "util.hpp"
 
-
+//const std::vector<Vec3f>* envmap;
+const unsigned char* envmap;
+uint32_t envmap_width, envmap_height;
 
 
 bool Sphere::ray_intersect(const Vec3f& orig, const Vec3f& dir, float& t0) const
@@ -64,8 +66,6 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphe
 	return std::min(spheres_dist, checkerboard_dist) < 1000;
 }
 
-const std::vector<Vec3f> *envmap;
-uint32_t envmap_width, envmap_height;
 
 Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, const std::vector<Light_t>& lights, size_t depth = 0)
 {
@@ -76,7 +76,9 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& s
 	{
 		size_t u = envmap_width * (0.5 + atan2(dir.z, dir.x) / (2 * M_PI));
 		size_t v = envmap_height * (0.5 - asin(dir.y) / M_PI);
-		return (*envmap)[u + v * envmap_width];
+		//return (*envmap)[u + v * envmap_width];
+		size_t i = u + v * envmap_width;
+		return Vec3f(envmap[3 * i + 0], envmap[3 * i + 1], envmap[3 * i + 2]) * (1.f / 255.f);
 		//return Vec3f(0.2, 0.7, 0.8); // background color
 	}
 
@@ -119,7 +121,7 @@ Material     mirror(Vec4f(0.0f, 10.0f, 0.8f, 0.0f), Vec3f(1.0f, 1.0f, 1.0f), 142
 Material      glass(Vec4f(0.0, 0.5, 0.1, 0.8), Vec3f(0.6, 0.7, 0.8), 125., 1.5);
 
 
-void render(std::vector<unsigned>& framebuffer, const int width, const int height, const std::vector<Vec3f> *envmap, const int env_width, const int env_height)
+void render(std::vector<unsigned>& framebuffer, const int width, const int height, const unsigned char *envmap, const int env_width, const int env_height)//const std::vector<Vec3f> *envmap
 {
 	::envmap = envmap;
 	::envmap_width = env_width;
@@ -148,8 +150,8 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 	}
 }
 
-/*
+
 std::vector<uint64_t> render2(const int width, const int height )
 {
-
-}*/
+	return std::vector<uint64_t>();
+}
