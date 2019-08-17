@@ -4,10 +4,10 @@ Article of ray sphere intersection:
 [lighthouse3d ray sphere intersection](https://www.lighthouse3d.com/tutorials/maths/ray-sphere-intersection/)
 
 stb image library, used for jpeg loading:
-https://github.com/nothings/stb
+[stb image github page](https://github.com/nothings/stb)
 
 
 Book: Ray Tracing in One Weekend #Peter Shirley
-https://github.com/RayTracing/raytracinginoneweekend
-https://drive.google.com/drive/u/0/folders/14yayBb9XiL16lmuhbYhhvea8mKUUK77W
-http://www.realtimerendering.com
+[raytracing in oneweekend github](https://github.com/RayTracing/raytracinginoneweekend)
+[raytracing in oneweekend googledrive](https://drive.google.com/drive/u/0/folders/14yayBb9XiL16lmuhbYhhvea8mKUUK77W)
+[](http://www.realtimerendering.com)
