@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.29102.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "smpl_raytracer", "smpl_raytracer.vcxproj", "{BBC4B42D-D197-432C-8750-2B7DDBC1DDAA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stb_image", "stb_image.vcxproj", "{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{BBC4B42D-D197-432C-8750-2B7DDBC1DDAA}.Release|x64.Build.0 = Release|x64
 		{BBC4B42D-D197-432C-8750-2B7DDBC1DDAA}.Release|x86.ActiveCfg = Release|Win32
 		{BBC4B42D-D197-432C-8750-2B7DDBC1DDAA}.Release|x86.Build.0 = Release|Win32
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Debug|x64.ActiveCfg = Debug|x64
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Debug|x64.Build.0 = Debug|x64
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Debug|x86.ActiveCfg = Debug|Win32
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Debug|x86.Build.0 = Debug|Win32
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Release|x64.ActiveCfg = Release|x64
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Release|x64.Build.0 = Release|x64
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Release|x86.ActiveCfg = Release|Win32
+		{ACA667B8-FD0A-4281-8BF3-AA158C84A8D2}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
