@@ -8,6 +8,9 @@ stb image library, used for jpeg loading:
 
 
 Book: Ray Tracing in One Weekend #Peter Shirley
+
 [raytracing in oneweekend github](https://github.com/RayTracing/raytracinginoneweekend)
+
 [raytracing in oneweekend googledrive](https://drive.google.com/drive/u/0/folders/14yayBb9XiL16lmuhbYhhvea8mKUUK77W)
+
 [](http://www.realtimerendering.com)
