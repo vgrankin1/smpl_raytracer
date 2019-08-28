@@ -1,0 +1,10 @@
+This application bundles the following third-party software in accordance with the following licenses:
+
+-------------------------------------------------------------------------
+
+Package: SDL2
+Authors: Sam Lantinga  (slouken@libsdl.org)
+Source: https://www.libsdl.org/
+License: ZLIB
+
+-------------------------------------------------------------------------
