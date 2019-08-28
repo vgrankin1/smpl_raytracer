@@ -14,10 +14,10 @@
 #include "stb_image.h"
 
 #if _MSC_VER
-#include "SDL2-devel-2.0.9-VC/include/SDL.h"
+#include "SDL2/SDL.h"
 
-#pragma comment(lib, "../SDL2-devel-2.0.9-VC/lib/x64/SDL2.lib")
-#pragma comment(lib, "../SDL2-devel-2.0.9-VC/lib/x64/SDL2main.lib")
+#pragma comment(lib, "SDL2.lib")
+#pragma comment(lib, "SDL2main.lib")
 
 //#pragma warning( disable : 26451 )
 #endif
@@ -69,7 +69,7 @@ int main()
 
 	int envmap_width, envmap_height;
 	int n = 0;
-	unsigned char* pixmap = stbl::stbi_load("../envmap.jpg", &envmap_width, &envmap_height, &n, 0);
+	unsigned char* pixmap = stbl::stbi_load("envmap.jpg", &envmap_width, &envmap_height, &n, 0);
 	if (!pixmap || 3 != n) {
 		std::cerr << "Error: can not load the environment map" << std::endl;
 		return -1;

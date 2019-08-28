@@ -8,7 +8,7 @@
 #define STB_API __declspec(dllexport)
 #else
 #define STB_API __declspec(dllimport)
-#pragma comment(lib, "../stb_image.lib")
+#pragma comment(lib, "stb_image.lib")
 #endif
 
 namespace stbl
