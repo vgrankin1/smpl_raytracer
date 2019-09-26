@@ -120,10 +120,14 @@ struct envmap_env_t//envelope for env map
 
 struct render_state_t
 {
+	render_state_t()
+		: pixels_cnt(), terminate(false)
+	{}
 	sdl_window_t* pwindow;
 	envmap_env_t* penvmap;
 	std::vector<unsigned long long> pixels;
 	unsigned int pixels_cnt;
 	int workers_num;
 	std::mutex mx;
+	bool terminate;
 };

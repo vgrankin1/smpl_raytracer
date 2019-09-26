@@ -205,7 +205,11 @@ void render2(render_state_t *rstate, const int worker_id)
 
 		rstate->mx.lock();
 		rstate->pixels.push_back(packed);
+		if (rstate->terminate)
+		{
+			rstate->mx.unlock();
+			break;
+		}
 		rstate->mx.unlock();
 	}
-	return;
 }

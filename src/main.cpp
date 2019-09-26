@@ -84,7 +84,7 @@ int main()
 	render_state1.pwindow = &mainWindow;
 	render_state1.penvmap = &envmap;
 	render_state1.pixels_cnt = 0;
-	render_state1.workers_num = 1;
+	render_state1.workers_num = 4;
 	for (int i = 0; i < render_state1.workers_num; i++)
 		r_threads.push_back( std::thread(render2, &render_state1, i) );
 
@@ -147,6 +147,11 @@ int main()
 	SDL_DestroyWindow(mainWindow.window);
 	SDL_Quit();
 
+	render_state1.terminate = true;
+	for (auto &i : r_threads)
+	{
+		i.join();
+	}
 	return 0;
 }
 
