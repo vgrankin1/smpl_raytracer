@@ -151,7 +151,82 @@ void render(std::vector<unsigned>& framebuffer, const int width, const int heigh
 }
 
 
-std::vector<uint64_t> render2(const int width, const int height )
+unsigned mrand_1080n(unsigned x)
 {
-	return std::vector<uint64_t>();
+	const unsigned m = 0x400000;
+	const unsigned a = 360237;
+	x = (a * x + 1) % m;
+	return x;
+}
+
+void render2(render_state_t *rstate, const int worker_id)
+{
+	int width = rstate->pwindow->width;
+	int height = rstate->pwindow->height;
+	unsigned prand_seed = 0;
+	::envmap = rstate->penvmap->pixmap;
+	::envmap_width = rstate->penvmap->width;
+	::envmap_height = rstate->penvmap->height;
+
+	std::vector<Sphere> spheres;
+	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
+	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, glass));
+	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
+	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, mirror));
+
+	std::vector<Light_t> lights;
+	lights.push_back(Light_t(Vec3f(-20, 20, 20), 1.5f));
+	lights.push_back(Light_t(Vec3f(30, 50, -25), 1.8f));
+	lights.push_back(Light_t(Vec3f(30, 20, 30), 1.7f));
+	/*
+	for (size_t j = 0; j < height; j++)
+	{
+		for (size_t i = 0; i < width; i++)
+		{
+			float x = (2 * (i + 0.5f) / float(width) - 1) * tan(fov / 2.0f) * width / float(height);
+			float y = -(2 * (j + 0.5f) / float(height) - 1) * tan(fov / 2.0f);
+			Vec3f dir = Vec3f(x, y, -1).normalize();
+
+			unsigned int pixcolor = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
+			unsigned int pixindex = i + j * width;
+			unsigned long long packed = ((unsigned long long)pixindex << 32) + pixcolor;
+
+			rstate->mx.lock();
+			rstate->pixels.push_back(packed);
+			rstate->mx.unlock();
+		}
+	}*/
+	/*
+	if (worker_id == 0)
+		return;/**/
+	for (unsigned p = 0; p < width * height; p += rstate->workers_num)
+	{
+		unsigned i, j;
+		for(int ri = 0; ; ri++)
+		{
+			prand_seed = mrand_1080n(prand_seed);
+			//prand_seed++;
+			if (prand_seed >= width * height)
+				continue;
+			if(prand_seed % rstate->workers_num == worker_id)
+				break;
+		}
+
+
+		i = prand_seed % width;
+		j = (prand_seed - i) / width;
+
+		float x = (2 * (i + 0.5f) / float(width) - 1) * tan(fov / 2.0f) * width / float(height);
+		float y = -(2 * (j + 0.5f) / float(height) - 1) * tan(fov / 2.0f);
+		Vec3f dir = Vec3f(x, y, -1).normalize();
+
+		unsigned int pixcolor = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
+		unsigned int pixindex = i + j * width;
+		unsigned long long packed = ((unsigned long long)pixindex << 32) + pixcolor;
+
+		rstate->mx.lock();
+		rstate->pixels.push_back(packed);
+		rstate->mx.unlock();
+	}
+	return;
 }

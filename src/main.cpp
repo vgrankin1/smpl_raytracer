@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <vector>
+#include <string>
 
 #include <chrono>
 #include <thread>
@@ -11,10 +12,9 @@
 
 /*#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"*/
-#include "stb_image.h"
+
 
 #if _MSC_VER
-#include "SDL2/SDL.h"
 
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
@@ -23,22 +23,19 @@
 #endif
 
 
-
-
-
-struct sdl_window_t
-{
-	SDL_Window *window;
-	SDL_Renderer *renderer;
-	SDL_Event event;
-	SDL_Texture *framebuffer;
-	int width, height;
-};
-
 void render(std::vector<unsigned>& framebuffer, const int width, const int height, const unsigned char *envmap, const int env_width, const int env_height);//const std::vector<Vec3f> *envmap
 
-std::thread threads[10];
-std::mutex mtx1;
+void render2(render_state_t* rstate, const int worker_id);
+
+std::vector<std::thread> r_threads;
+
+
+struct frame_counter_t
+{
+	frame_counter_t()
+	{}
+	size_t frame;
+};
 
 int main()
 {
@@ -52,25 +49,8 @@ int main()
 
 	std::vector<unsigned> framebuffer(mainWindow.width*mainWindow.height);
 
-
-	/*
-	auto func = [](const std::string& first, const std::string& second)
-	{
-		std::cout << first << second;
-	};
-	std::thread thread(func, "Hello, ", "threads!");
-	
-	std::cout << "\njoinable: " << thread.joinable() << std::endl;
-	std::this_thread::sleep_for(std::chrono::seconds(4));
-	std::cout << "joinable: " << thread.joinable() << std::endl;
-
-	thread.join();
-	std::cout << "joinable: " << thread.joinable() << std::endl;*/
-
-	int envmap_width, envmap_height;
-	int n = 0;
-	unsigned char* pixmap = stbl::stbi_load("envmap.jpg", &envmap_width, &envmap_height, &n, 0);
-	if (!pixmap || 3 != n) {
+	envmap_env_t envmap;
+	if (envmap.load("envmap.jpg") != 0) {
 		std::cerr << "Error: can not load the environment map" << std::endl;
 		return -1;
 	}
@@ -88,7 +68,16 @@ int main()
 	mainWindow.framebuffer = SDL_CreateTexture(mainWindow.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, mainWindow.width, mainWindow.height);
 
 
-	for (uint64_t frame_cnt = 0; ; frame_cnt++)
+
+	render_state_t render_state1;
+	render_state1.pwindow = &mainWindow;
+	render_state1.penvmap = &envmap;
+	render_state1.pixels_cnt = 0;
+	render_state1.workers_num = 3;
+	for (int i = 0; i < render_state1.workers_num; i++)
+		r_threads.push_back( std::thread(render2, &render_state1, i) );
+
+	for (uint64_t frame_cnt = 0; ; )
 	{
 		tp_begin = std::chrono::high_resolution_clock::now();
 		SDL_PollEvent(&mainWindow.event);
@@ -96,22 +85,29 @@ int main()
 			break;
 		}
 
-		auto render_thread = [](std::vector<unsigned> *framebuffer, const int width, const int height, const unsigned char*envmap, int envmap_width, int envmap_height)
+		
+		if (render_state1.mx.try_lock())
 		{
-			mtx1.lock();
-			render(*framebuffer, width, height, envmap, envmap_width, envmap_height);
-			mtx1.unlock();
-		};
-
-		if (mtx1.try_lock())
-		{
-			SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width * 4);
-			if (threads[0].joinable())
-				threads[0].join();
-			for (int i = 0; i < 1; ++i)
-				threads[i] = std::thread(render_thread, &framebuffer, mainWindow.width, mainWindow.height, pixmap, envmap_width, envmap_height);
-			mtx1.unlock();
+			for (int i = 0; render_state1.pixels.size() != 0 ; i++)//&& i < 128
+			{
+				unsigned long long packed_pixel = render_state1.pixels.back();
+				render_state1.pixels.pop_back();
+				render_state1.pixels_cnt++;
+				unsigned int pixcolor = packed_pixel & 0xffffffff;
+				unsigned int pixindex = packed_pixel >> 32;
+				framebuffer[pixindex] = pixcolor;
+			}
+			render_state1.mx.unlock();
 		}
+		SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width * 4);
+
+			
+		if (render_state1.pixels_cnt >= mainWindow.width * mainWindow.height)
+		{
+			frame_cnt++;
+			render_state1.pixels_cnt -= mainWindow.width * mainWindow.height;
+		}
+	
 		
 
 		SDL_RenderClear(mainWindow.renderer);
@@ -123,7 +119,7 @@ int main()
 		if (tp_time_cnt >= 1.0)
 		{
 			tp_time_cnt_frame = frame_cnt - tp_time_cnt_frame + 1;
-			std::cout << "FPS: " << tp_time_cnt_frame / tp_time_cnt << " with time: " << tp_time_cnt / tp_time_cnt_frame << "s" << std::endl;
+			std::cout << "FPS: " << tp_time_cnt_frame / tp_time_cnt << " with time: " << tp_time_cnt / double(tp_time_cnt_frame) << "s" << std::endl;
 			tp_time_cnt_frame = frame_cnt;
 			tp_time_cnt = 0;
 		}
@@ -133,7 +129,7 @@ int main()
 	SDL_DestroyWindow(mainWindow.window);
 	SDL_Quit();
 
-	stbl::stbi_image_free(pixmap);
+	
 	return 0;
 }
 

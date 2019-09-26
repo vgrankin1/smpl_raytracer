@@ -2,7 +2,11 @@
 
 #include <vector>
 #include <algorithm>
+#include <mutex>
 #include "geometry.hpp"
+
+
+
 
 union unColor_t
 {
@@ -70,9 +74,56 @@ public:
 
 
 
+
 class Scene_t
 {
 public:
 	const std::vector<Vec3f>* envmap;
 	uint32_t envmap_width, envmap_height;
+};
+
+
+#include "SDL2/SDL.h"
+
+struct sdl_window_t
+{
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+	SDL_Event event;
+	SDL_Texture* framebuffer;
+	int width, height;
+};
+
+#include "stb_image.h"
+
+struct envmap_env_t//envelope for env map
+{
+	envmap_env_t()
+		: n(), width(), height(), pixmap() {}
+	int n, width, height;
+	unsigned char* pixmap;
+
+	int load(const char* file_name)
+	{
+		n = 0;
+		pixmap = stbl::stbi_load(file_name, &width, &height, &n, 0);
+		if (!pixmap || 3 != n)
+			return -1;
+		return 0;
+	}
+	~envmap_env_t()
+	{
+		if (pixmap)
+			stbl::stbi_image_free(pixmap);
+	}
+};
+
+struct render_state_t
+{
+	sdl_window_t* pwindow;
+	envmap_env_t* penvmap;
+	std::vector<unsigned long long> pixels;
+	unsigned int pixels_cnt;
+	int workers_num;
+	std::mutex mx;
 };

@@ -21,10 +21,11 @@
   <ItemGroup>
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\render.cpp" />
+    <ClCompile Include="..\src\rnd_test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\geometry.hpp" />
-    <ClInclude Include="..\util.hpp" />
+    <ClInclude Include="..\src\geometry.hpp" />
+    <ClInclude Include="..\src\util.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -84,6 +85,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
+    <IncludePath>D:\smpl_raytracer\src\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
