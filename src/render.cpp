@@ -178,40 +178,19 @@ void render2(render_state_t *rstate, const int worker_id)
 	lights.push_back(Light_t(Vec3f(-20, 20, 20), 1.5f));
 	lights.push_back(Light_t(Vec3f(30, 50, -25), 1.8f));
 	lights.push_back(Light_t(Vec3f(30, 20, 30), 1.7f));
-	/*
-	for (size_t j = 0; j < height; j++)
-	{
-		for (size_t i = 0; i < width; i++)
-		{
-			float x = (2 * (i + 0.5f) / float(width) - 1) * tan(fov / 2.0f) * width / float(height);
-			float y = -(2 * (j + 0.5f) / float(height) - 1) * tan(fov / 2.0f);
-			Vec3f dir = Vec3f(x, y, -1).normalize();
 
-			unsigned int pixcolor = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
-			unsigned int pixindex = i + j * width;
-			unsigned long long packed = ((unsigned long long)pixindex << 32) + pixcolor;
 
-			rstate->mx.lock();
-			rstate->pixels.push_back(packed);
-			rstate->mx.unlock();
-		}
-	}*/
-	/*
-	if (worker_id == 0)
-		return;/**/
 	for (unsigned p = 0; p < width * height; p += rstate->workers_num)
 	{
 		unsigned i, j;
-		for(int ri = 0; ; ri++)
+		for(; ; )
 		{
 			prand_seed = mrand_1080n(prand_seed);
-			//prand_seed++;
 			if (prand_seed >= width * height)
 				continue;
 			if(prand_seed % rstate->workers_num == worker_id)
 				break;
 		}
-
 
 		i = prand_seed % width;
 		j = (prand_seed - i) / width;
