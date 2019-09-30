@@ -21,7 +21,7 @@
     <ClCompile Include="..\src\render.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\rnd_test.cpp">
+    <ClCompile Include="..\src\model.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

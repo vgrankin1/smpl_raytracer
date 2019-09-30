@@ -6,8 +6,6 @@
 #include "geometry.hpp"
 
 
-
-
 union unColor_t
 {
 	struct
@@ -36,10 +34,13 @@ inline unsigned toColor(const Vec3f& color)
 class SceneObject_t
 {
 public:
+	SceneObject_t()
+		: position()
+	{}
 	SceneObject_t(const Vec3f& position)
 		: position(position) {}
 	Vec3f position;
-
+	virtual ~SceneObject_t() {}
 };
 
 class Light_t : public SceneObject_t
@@ -73,13 +74,67 @@ public:
 };
 
 
+class Model : public SceneObject_t
+{
+private:
+	std::vector<Vec3f> verts;
+	std::vector<Vec3i> faces;
+public:
+	Model(const char* filename);
 
+	int nverts() const;                          // number of vertices
+	int nfaces() const;                          // number of triangles
+
+	bool ray_triangle_intersect(const int& fi, const Vec3f& orig, const Vec3f& dir, float& tnear) const;
+
+	const Vec3f& point(int i) const;                   // coordinates of the vertex i
+	Vec3f& point(int i);                   // coordinates of the vertex i
+	int vert(int fi, int li) const;              // index of the vertex for the triangle fi and local index li
+	void get_bbox(Vec3f& min, Vec3f& max); // bounding box for all the vertices, including isolated ones
+};
+
+std::ostream& operator<<(std::ostream& out, Model& m);
+
+
+
+#include "stb_image.h"
+
+class envmap_env_t//envelope for env map
+{
+public:
+	envmap_env_t()
+		: n(), width(), height(), pixmap() {}
+	envmap_env_t(const char* file_name)
+		: n(), width(), height(), pixmap() 
+	{
+		n = 0;
+		pixmap = stbl::stbi_load(file_name, &width, &height, &n, 0);
+		if (!pixmap || 3 != n)
+			throw std::string("Error: can not load the environment map") + file_name;
+	}
+	~envmap_env_t()
+	{
+		if (pixmap)
+			stbl::stbi_image_free(pixmap);
+	}
+	int n, width, height;
+	unsigned char* pixmap;
+};
 
 class Scene_t
 {
 public:
-	const std::vector<Vec3f>* envmap;
-	uint32_t envmap_width, envmap_height;
+	Scene_t()
+		: penvmap(0)
+	{}
+	Scene_t(const envmap_env_t* penvmap)
+		: penvmap(penvmap)
+	{}
+
+	const envmap_env_t* penvmap;
+
+	std::vector<const Light_t*> lights;
+	std::vector<const SceneObject_t*> objects;
 };
 
 
@@ -91,43 +146,36 @@ struct sdl_window_t
 	SDL_Renderer* renderer;
 	SDL_Event event;
 	SDL_Texture* framebuffer;
-	int width, height;
+	unsigned int width, height;
 };
 
-#include "stb_image.h"
 
-struct envmap_env_t//envelope for env map
-{
-	envmap_env_t()
-		: n(), width(), height(), pixmap() {}
-	int n, width, height;
-	unsigned char* pixmap;
-
-	int load(const char* file_name)
-	{
-		n = 0;
-		pixmap = stbl::stbi_load(file_name, &width, &height, &n, 0);
-		if (!pixmap || 3 != n)
-			return -1;
-		return 0;
-	}
-	~envmap_env_t()
-	{
-		if (pixmap)
-			stbl::stbi_image_free(pixmap);
-	}
-};
 
 struct render_state_t
 {
 	render_state_t()
-		: pixels_cnt(), terminate(false)
+		: pwindow(), pixels_cnt(), workers_num(), terminate(false)
 	{}
 	sdl_window_t* pwindow;
-	envmap_env_t* penvmap;
-	std::vector<unsigned long long> pixels;
-	unsigned int pixels_cnt;
+	std::vector<unsigned long long> pixels;	//rendered pixels by render, need to move to framebuffer
+	unsigned int pixels_cnt;				//just count of rendered pixels of current frame
 	int workers_num;
 	std::mutex mx;
 	bool terminate;
 };
+
+
+inline unsigned mrand_1080n(unsigned x)
+{
+	const unsigned m = 0x400000;
+	const unsigned a = 360237;
+	x = (a * x + 1) % m;
+	return x;
+}
+inline unsigned mrand_4k(unsigned x)
+{
+	const unsigned m = 0x1000000;
+	const unsigned a = 360237;
+	x = (a * x + 1) % m;
+	return x;
+}

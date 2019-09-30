@@ -5,10 +5,6 @@
 #include "geometry.hpp"
 #include "util.hpp"
 
-//const std::vector<Vec3f>* envmap;
-const unsigned char* envmap;
-uint32_t envmap_width, envmap_height;
-
 
 bool Sphere::ray_intersect(const Vec3f& orig, const Vec3f& dir, float& t0) const
 {
@@ -39,145 +35,119 @@ Vec3f refract(const Vec3f& I, const Vec3f& N, const float eta_t, const float eta
 }
 
 	
-bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material &material)
+bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, Vec3f& hit, Vec3f& N, Material& material)
 {
 	float spheres_dist = std::numeric_limits<float>::max();
-	for (size_t i = 0; i < spheres.size(); i++) {
-		float dist_i;
-		if (spheres[i].ray_intersect(orig, dir, dist_i) && dist_i < spheres_dist) {
-			spheres_dist = dist_i;
-			hit = orig + dir * dist_i;
-			N = (hit - spheres[i].position).normalize();
-			material = spheres[i].material;
+	float duck_dist = std::numeric_limits<float>::max();
+	for (int j = 0; j < scene.objects.size(); j++)
+	{
+		const SceneObject_t* sc_obj = scene.objects[j];
+		const Sphere* sphere = dynamic_cast<const Sphere*>(sc_obj);
+		const Model *model = dynamic_cast<const Model*>(sc_obj);
+		if (sphere)
+		{
+			float dist_i;
+			if (sphere->ray_intersect(orig, dir, dist_i) && dist_i < spheres_dist)
+			{
+				spheres_dist = dist_i;
+				hit = orig + dir * dist_i;
+				N = (hit - sphere->position).normalize();
+				material = sphere->material;
+			}
+		}
+		else if (model)
+		{
+			for (int t = 0; t < model->nfaces(); t++)
+			{
+				float dist;
+				if (model->ray_triangle_intersect(t, orig, dir, dist) && dist < duck_dist && dist < spheres_dist)
+				{
+					duck_dist = dist;
+					hit = orig + dir * dist;
+					Vec3f v0 = model->point(model->vert(t, 0));
+					Vec3f v1 = model->point(model->vert(t, 1));
+					Vec3f v2 = model->point(model->vert(t, 2));
+					N = cross(v1 - v0, v2 - v0).normalize();
+					material = Material(Vec4f(0.3, 1.5, 0.2, 0.5), Vec3f(.24, .21, .09), 125., 1.5);
+				}
+			}
 		}
 	}
 
 	float checkerboard_dist = std::numeric_limits<float>::max();
-	if (fabs(dir.y) > 1e-3) {
+	if (fabs(dir.y) > 1e-3)
+	{
 		float d = -(orig.y + 4) / dir.y; // the checkerboard plane has equation y = -4
 		Vec3f pt = orig + dir * d;
-		if (d > 0 && fabs(pt.x) < 10 && pt.z<-10 && pt.z>-30 && d < spheres_dist) {
+		if (d > 0 && fabs(pt.x) < 10 && pt.z<-10 && pt.z>-30 && d < spheres_dist && d < duck_dist)
+		{
 			checkerboard_dist = d;
 			hit = pt;
 			N = Vec3f(0, 1, 0);
 			material.diffuse = (int(.5 * hit.x + 1000) + int(.5 * hit.z)) & 1 ? Vec3f(.3, .3, .3) : Vec3f(.3, .2, .1);
 		}
 	}
-	return std::min(spheres_dist, checkerboard_dist) < 1000;
+	return std::min(duck_dist, std::min(spheres_dist, checkerboard_dist)) < 1000;
 }
 
 
-Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const std::vector<Sphere>& spheres, const std::vector<Light_t>& lights, size_t depth = 0)
+Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, size_t depth = 0)
 {
 	Vec3f point, N;
 	Material material;
+	const std::vector<const Light_t*>& lights = scene.lights;
+	
 
-	if (depth > 4 || !scene_intersect(orig, dir, spheres, point, N, material))
+	if (depth > 4 || !scene_intersect(orig, dir, scene, point, N, material))
 	{
-		size_t u = envmap_width * (0.5 + atan2(dir.z, dir.x) / (2 * M_PI));
-		size_t v = envmap_height * (0.5 - asin(dir.y) / M_PI);
-		//return (*envmap)[u + v * envmap_width];
-		size_t i = u + v * envmap_width;
-		return Vec3f(envmap[3 * i + 0], envmap[3 * i + 1], envmap[3 * i + 2]) * (1.f / 255.f);
+		size_t u = scene.penvmap->width * (0.5 + atan2(dir.z, dir.x) / (2 * M_PI));
+		size_t v = scene.penvmap->height * (0.5 - asin(dir.y) / M_PI);
+		size_t i = u + v * scene.penvmap->width;//return (*envmap)[u + v * envmap_width];
+		unsigned char* pixel = scene.penvmap->pixmap;
+		return Vec3f(pixel[3 * i + 0], pixel[3 * i + 1], pixel[3 * i + 2]) * (1.f / 255.f);
 		//return Vec3f(0.2, 0.7, 0.8); // background color
 	}
 
 	//Reflections
 	Vec3f reflect_dir = reflect(dir, N).normalize();
 	Vec3f reflect_orig = reflect_dir * N < 0 ? point - N * 1e-3 : point + N * 1e-3; // offset the original point to avoid occlusion by the object itself
-	Vec3f reflect_color = cast_ray(reflect_orig, reflect_dir, spheres, lights, depth + 1);
+	Vec3f reflect_color = cast_ray(reflect_orig, reflect_dir, scene, depth + 1);
 	//Refractions
 	Vec3f refract_dir = refract(dir, N, material.refractive).normalize();
 	Vec3f refract_orig = refract_dir * N < 0 ? point - N * 1e-3 : point + N * 1e-3;
-	Vec3f refract_color = cast_ray(refract_orig, refract_dir, spheres, lights, depth + 1);
+	Vec3f refract_color = cast_ray(refract_orig, refract_dir, scene, depth + 1);
 
 	float diffuse_light_intensity = 0, specular_light_intensity = 0;
 	for (size_t i = 0; i < lights.size(); i++)
 	{
-		Vec3f light_dir = (lights[i].position - point).normalize();
-		float light_distance = (lights[i].position - point).norm();
+		Vec3f light_dir = (lights[i]->position - point).normalize();
+		float light_distance = (lights[i]->position - point).norm();
 
 		//Shadows
 		Vec3f shadow_orig = light_dir * N < 0 ? point - N * 1e-3 : point + N * 1e-3; // checking if the point lies in the shadow of the lights[i]
 		Vec3f shadow_pt, shadow_N;
 		Material tmpmaterial;
-		if (scene_intersect(shadow_orig, light_dir, spheres, shadow_pt, shadow_N, tmpmaterial) && (shadow_pt - shadow_orig).norm() < light_distance)
+		if (scene_intersect(shadow_orig, light_dir, scene, shadow_pt, shadow_N, tmpmaterial) && (shadow_pt - shadow_orig).norm() < light_distance)
 			continue;
 
-		diffuse_light_intensity += lights[i].intensity * std::max(0.f, light_dir * N);
-		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i].intensity;
+		diffuse_light_intensity += lights[i]->intensity * std::max(0.f, light_dir * N);
+		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i]->intensity;
 	}
 
 	return material.diffuse * diffuse_light_intensity * material.albedo[0] + 
-		Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1] +
+			Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1] +
 		reflect_color * material.albedo[2] + refract_color * material.albedo[3];
 }
 
+
 const float fov = M_PI / 2.;
 
-Material      ivory(Vec4f(0.6f, 0.3f, 0.1f, 0.0f), Vec3f(0.4f, 0.4f, 0.3f), 50.0f, 1.0);
-Material red_rubber(Vec4f(0.9f, 0.1f, 0.1f, 0.0f), Vec3f(0.3f, 0.1f, 0.1f), 10.0f, 1.0);
-Material     mirror(Vec4f(0.0f, 10.0f, 0.8f, 0.0f), Vec3f(1.0f, 1.0f, 1.0f), 1425.f, 1.0);
-Material      glass(Vec4f(0.0, 0.5, 0.1, 0.8), Vec3f(0.6, 0.7, 0.8), 125., 1.5);
 
-
-void render(std::vector<unsigned>& framebuffer, const int width, const int height, const unsigned char *envmap, const int env_width, const int env_height)//const std::vector<Vec3f> *envmap
+void render2(Scene_t *scene, render_state_t *rstate, const int worker_id)
 {
-	::envmap = envmap;
-	::envmap_width = env_width;
-	::envmap_height = env_height;
-
-	std::vector<Sphere> spheres;
-	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
-	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, glass));
-	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
-	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, mirror));
-
-	std::vector<Light_t> lights;
-	lights.push_back(Light_t(Vec3f(-20, 20, 20), 1.5f) );
-	lights.push_back(Light_t(Vec3f(30, 50, -25), 1.8f) );
-	lights.push_back(Light_t(Vec3f(30, 20, 30), 1.7f) );
-
-	for (size_t j = 0; j < height; j++)
-	{
-		for (size_t i = 0; i < width; i++)
-		{
-			float x = (2 * (i + 0.5f) / float(width) - 1 ) * tan(fov / 2.0f) * width / float(height);
-			float y =-(2 * (j + 0.5f) / float(height) - 1 ) * tan(fov / 2.0f);
-			Vec3f dir = Vec3f(x, y, -1).normalize();
-			framebuffer[i + j * width] = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
-		}
-	}
-}
-
-
-unsigned mrand_1080n(unsigned x)
-{
-	const unsigned m = 0x400000;
-	const unsigned a = 360237;
-	x = (a * x + 1) % m;
-	return x;
-}
-
-void render2(render_state_t *rstate, const int worker_id)
-{
-	int width = rstate->pwindow->width;
-	int height = rstate->pwindow->height;
+	unsigned int width = rstate->pwindow->width;
+	unsigned int height = rstate->pwindow->height;
 	unsigned prand_seed = 0;
-	::envmap = rstate->penvmap->pixmap;
-	::envmap_width = rstate->penvmap->width;
-	::envmap_height = rstate->penvmap->height;
-
-	std::vector<Sphere> spheres;
-	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
-	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, glass));
-	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
-	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, mirror));
-
-	std::vector<Light_t> lights;
-	lights.push_back(Light_t(Vec3f(-20, 20, 20), 1.5f));
-	lights.push_back(Light_t(Vec3f(30, 50, -25), 1.8f));
-	lights.push_back(Light_t(Vec3f(30, 20, 30), 1.7f));
 
 
 	for (unsigned p = 0; p < width * height; p += rstate->workers_num)
@@ -199,7 +169,7 @@ void render2(render_state_t *rstate, const int worker_id)
 		float y = -(2 * (j + 0.5f) / float(height) - 1) * tan(fov / 2.0f);
 		Vec3f dir = Vec3f(x, y, -1).normalize();
 
-		unsigned int pixcolor = toColor(cast_ray(Vec3f(0, 0, 0), dir, spheres, lights));
+		unsigned int pixcolor = toColor(cast_ray(Vec3f(0, 0, 0), dir, *scene));
 		unsigned int pixindex = i + j * width;
 		unsigned long long packed = ((unsigned long long)pixindex << 32) + pixcolor;
 
