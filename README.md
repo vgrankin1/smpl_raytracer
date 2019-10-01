@@ -1,3 +1,5 @@
+Simple raytracer, multithreaded with prandom render 
+
 Based on #ssloy lessons [tinyraytracer](https://github.com/ssloy/tinyraytracer)
 
 Article of ray sphere intersection:
