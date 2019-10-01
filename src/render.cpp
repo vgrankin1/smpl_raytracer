@@ -38,7 +38,7 @@ Vec3f refract(const Vec3f& I, const Vec3f& N, const float eta_t, const float eta
 bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, Vec3f& hit, Vec3f& N, Material& material)
 {
 	float spheres_dist = std::numeric_limits<float>::max();
-	float duck_dist = std::numeric_limits<float>::max();
+	float model_dist = std::numeric_limits<float>::max();
 	for (int j = 0; j < scene.objects.size(); j++)
 	{
 		const SceneObject_t* sc_obj = scene.objects[j];
@@ -55,22 +55,9 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, 
 				material = sphere->material;
 			}
 		}
-		else if (model)
+		else if (model && model->ray_bbox_intersect(orig, dir) )
 		{
-			for (int t = 0; t < model->nfaces(); t++)
-			{
-				float dist;
-				if (model->ray_triangle_intersect(t, orig, dir, dist) && dist < duck_dist && dist < spheres_dist)
-				{
-					duck_dist = dist;
-					hit = orig + dir * dist;
-					Vec3f v0 = model->point(model->vert(t, 0));
-					Vec3f v1 = model->point(model->vert(t, 1));
-					Vec3f v2 = model->point(model->vert(t, 2));
-					N = cross(v1 - v0, v2 - v0).normalize();
-					material = Material(Vec4f(0.3, 1.5, 0.2, 0.5), Vec3f(.24, .21, .09), 125., 1.5);
-				}
-			}
+			model->ray_intersect(orig, dir, model_dist, N, material);
 		}
 	}
 
@@ -79,15 +66,15 @@ bool scene_intersect(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, 
 	{
 		float d = -(orig.y + 4) / dir.y; // the checkerboard plane has equation y = -4
 		Vec3f pt = orig + dir * d;
-		if (d > 0 && fabs(pt.x) < 10 && pt.z<-10 && pt.z>-30 && d < spheres_dist && d < duck_dist)
+		if (d > 0 && fabs(pt.x) < 10 && pt.z<-10 && pt.z>-30 && d < spheres_dist && d < model_dist)
 		{
 			checkerboard_dist = d;
 			hit = pt;
 			N = Vec3f(0, 1, 0);
-			material.diffuse = (int(.5 * hit.x + 1000) + int(.5 * hit.z)) & 1 ? Vec3f(.3, .3, .3) : Vec3f(.3, .2, .1);
+			material.diffuse = (int(.5 * hit.x + 1000) + int(.5 * hit.z)) & 1 ? Vec3f(.3, .3, .3) : Vec3f(.1, .1, .2);
 		}
 	}
-	return std::min(duck_dist, std::min(spheres_dist, checkerboard_dist)) < 1000;
+	return std::min(model_dist, std::min(spheres_dist, checkerboard_dist)) < 1000;
 }
 
 
@@ -104,8 +91,7 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, size_t
 		size_t v = scene.penvmap->height * (0.5 - asin(dir.y) / M_PI);
 		size_t i = u + v * scene.penvmap->width;//return (*envmap)[u + v * envmap_width];
 		unsigned char* pixel = scene.penvmap->pixmap;
-		return Vec3f(pixel[3 * i + 0], pixel[3 * i + 1], pixel[3 * i + 2]) * (1.f / 255.f);
-		//return Vec3f(0.2, 0.7, 0.8); // background color
+		return Vec3f(pixel[3 * i + 0], pixel[3 * i + 1], pixel[3 * i + 2]) * (1.f / 255.f); //background color
 	}
 
 	//Reflections
@@ -134,9 +120,9 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, size_t
 		specular_light_intensity += powf(std::max(0.f, -reflect(-light_dir, N) * dir), material.specular_exponent) * lights[i]->intensity;
 	}
 
-	return material.diffuse * diffuse_light_intensity * material.albedo[0] + 
+	return	material.diffuse * diffuse_light_intensity * material.albedo[0] + 
 			Vec3f(1., 1., 1.) * specular_light_intensity * material.albedo[1] +
-		reflect_color * material.albedo[2] + refract_color * material.albedo[3];
+			reflect_color * material.albedo[2] + refract_color * material.albedo[3];
 }
 
 

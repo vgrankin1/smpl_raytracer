@@ -30,6 +30,7 @@ inline unsigned toColor(const Vec3f& color)
 	return toColor(color.r, color.g, color.b);
 }
 
+bool RayIntersectsTriangle(const Vec3f& orig, const Vec3f& dir, float& dist, const Vec3f& vertex0, const Vec3f& vertex1, const Vec3f& vertex2);//in model.cpp
 
 class SceneObject_t
 {
@@ -79,13 +80,18 @@ class Model : public SceneObject_t
 private:
 	std::vector<Vec3f> verts;
 	std::vector<Vec3i> faces;
+	Vec3f bb_min, bb_max;
+
+	void calc_bbox();
 public:
 	Model(const char* filename);
 
 	int nverts() const;                          // number of vertices
 	int nfaces() const;                          // number of triangles
 
-	bool ray_triangle_intersect(const int& fi, const Vec3f& orig, const Vec3f& dir, float& tnear) const;
+	bool ray_intersect(const Vec3f& orig, const Vec3f& dir, float& dist, Vec3f& N, Material& material) const;
+	bool ray_triangle_intersect(const int fi, const Vec3f& orig, const Vec3f& dir, float &tnear) const;
+	bool ray_bbox_intersect(const Vec3f& orig, const Vec3f& dir) const;
 
 	const Vec3f& point(int i) const;                   // coordinates of the vertex i
 	Vec3f& point(int i);                   // coordinates of the vertex i

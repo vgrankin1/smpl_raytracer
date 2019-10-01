@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+﻿#define _CRT_SECURE_NO_WARNINGS
 
 #include <iostream>
 #include <cassert>
@@ -52,14 +52,7 @@ Model::Model(const char *filename) : verts(), faces()
 				std::cerr << "Cannot read file: " << filename << std::endl;
 				throw std::string("Cannot read file: ") + filename;
 			}
-            /**//*
-			while (iss >> idx) 
-			{
-                idx--; // in wavefront obj all indices start at 1, not zero
-                f[cnt++] = idx;
-            }
-            if (3==cnt) faces.push_back(f);/**/
-			/**/
+
 			f[0]--;// in wavefront obj all indices start at 1, not zero
 			f[1]--;
 			f[2]--;
@@ -68,31 +61,91 @@ Model::Model(const char *filename) : verts(), faces()
     }
     std::cerr << "# v# " << verts.size() << " f# "  << faces.size() << std::endl;
 
-    Vec3f min, max;
-    get_bbox(min, max);
+	calc_bbox();
 }
 
-// Moller and Trumbore
-bool Model::ray_triangle_intersect(const int &fi, const Vec3f &orig, const Vec3f &dir, float &tnear) const
+void Model::calc_bbox()
 {
-    Vec3f edge1 = point(vert(fi,1)) - point(vert(fi,0));
-    Vec3f edge2 = point(vert(fi,2)) - point(vert(fi,0));
-    Vec3f pvec = cross(dir, edge2);
-    float det = edge1*pvec;
-    if (det<1e-5) return false;
-
-    Vec3f tvec = orig - point(vert(fi,0));
-    float u = tvec*pvec;
-    if (u < 0 || u > det) return false;
-
-    Vec3f qvec = cross(tvec, edge1);
-    float v = dir*qvec;
-    if (v < 0 || u + v > det) return false;
-
-    tnear = edge2*qvec * (1./det);
-    return tnear>1e-5;
+	bb_min = bb_max = verts[0];
+	for (size_t i = 1; i < verts.size(); ++i)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			bb_min[j] = std::min(bb_min[j], verts[i][j]);
+			bb_max[j] = std::max(bb_max[j], verts[i][j]);
+		}
+	}
+	std::cerr << "bbox: [" << bb_min << " : " << bb_max << "]" << std::endl;
 }
 
+bool Model::ray_bbox_intersect(const Vec3f& orig, const Vec3f& dir) const
+{
+	Vec3f p1, p2, p3, p4;//front
+	Vec3f p5, p6, p7, p8;//rear
+	Vec3f p9, p10, p11, p12;//left
+	Vec3f p13, p14, p15, p16;//right
+	float dist;
+	int ret = 0;
+	
+	p1 = Vec3f(bb_min.x, bb_min.y, bb_min.z);
+	p2 = Vec3f(bb_min.x, bb_max.y, bb_min.z);
+	p3 = Vec3f(bb_max.x, bb_max.y, bb_min.z);
+	p4 = Vec3f(bb_max.x, bb_min.y, bb_min.z);
+	ret += RayIntersectsTriangle(orig, dir, dist, p1, p2, p3);
+	ret += RayIntersectsTriangle(orig, dir, dist, p1, p4, p3);
+	
+	p5 = Vec3f(bb_min.x, bb_min.y, bb_max.z);
+	p6 = Vec3f(bb_min.x, bb_max.y, bb_max.z);
+	p7 = Vec3f(bb_max.x, bb_max.y, bb_max.z);
+	p8 = Vec3f(bb_max.x, bb_min.y, bb_max.z);
+	ret += RayIntersectsTriangle(orig, dir, dist, p5, p7, p6);
+	ret += RayIntersectsTriangle(orig, dir, dist, p5, p8, p7);
+	
+	p9 = Vec3f(bb_min.x, bb_min.y, bb_min.z);
+	p10 = Vec3f(bb_min.x, bb_max.y, bb_min.z);
+	p11 = Vec3f(bb_min.x, bb_max.y, bb_max.z);
+	p12 = Vec3f(bb_min.x, bb_min.y, bb_max.z);
+	ret += RayIntersectsTriangle(orig, dir, dist, p9, p10, p11);
+	ret += RayIntersectsTriangle(orig, dir, dist, p9, p11, p12);
+
+	p13 = Vec3f(bb_max.x, bb_min.y, bb_min.z);
+	p14 = Vec3f(bb_max.x, bb_max.y, bb_min.z);
+	p15 = Vec3f(bb_max.x, bb_max.y, bb_max.z);
+	p16 = Vec3f(bb_max.x, bb_min.y, bb_max.z);
+	ret += RayIntersectsTriangle(orig, dir, dist, p13, p14, p15);
+	ret += RayIntersectsTriangle(orig, dir, dist, p13, p15, p16);
+
+	return ret;
+}
+
+
+
+
+bool Model::ray_triangle_intersect(const int fi, const Vec3f& orig, const Vec3f& dir, float& tnear) const
+{
+
+	return RayIntersectsTriangle(orig, dir, tnear, verts[faces[fi][0]], verts[faces[fi][1]], verts[faces[fi][2]] );
+}
+
+bool Model::ray_intersect(const Vec3f& orig, const Vec3f& dir, float &dist, Vec3f& N, Material& material) const
+{
+	bool intersect = false;
+	for (int i = 0; i < faces.size(); i++)
+	{
+		Vec3f v0 = verts[faces[i][0]];
+		Vec3f v1 = verts[faces[i][1]];
+		Vec3f v2 = verts[faces[i][2]];
+		float cur_dist;
+		if (RayIntersectsTriangle(orig, dir, cur_dist, v0, v1, v2) && cur_dist < dist)
+		{
+			dist = cur_dist;
+			intersect = true;
+			N = cross(v1 - v0, v2 - v0).normalize();
+			material = Material(Vec4f(0.3, 1.5, 0.2, 0.5), Vec3f(.20, .21, .2), 125., 1.5);
+		}
+	}
+	return intersect;
+}
 
 int Model::nverts() const
 {
@@ -106,16 +159,8 @@ int Model::nfaces() const
 
 void Model::get_bbox(Vec3f &min, Vec3f &max)
 {
-    min = max = verts[0];
-    for (int i=1; i<(int)verts.size(); ++i) 
-	{
-        for (int j=0; j<3; j++) 
-		{
-            min[j] = std::min(min[j], verts[i][j]);
-            max[j] = std::max(max[j], verts[i][j]);
-        }
-    }
-    std::cerr << "bbox: [" << min << " : " << max << "]" << std::endl;
+	min = bb_min;
+	max = bb_max;
 }
 
 const Vec3f &Model::point(int i) const 
@@ -154,3 +199,36 @@ std::ostream& operator<<(std::ostream& out, Model &m)
     return out;
 }
 
+
+/*
+	Möller–Trumbore intersection algorithm
+*/
+bool RayIntersectsTriangle(const Vec3f& orig, const Vec3f& dir, float& dist, const Vec3f& v0, const Vec3f& v1, const Vec3f& v2)
+{
+	Vec3f pvec, tvec, q;
+	Vec3f edge1 = v1 - v0;
+	Vec3f edge2 = v2 - v0;
+	const float eps = 1e-7;
+	float det, u, v;
+
+	pvec = cross(dir, edge2);//vector normal to plane 
+	det = edge1 * pvec;
+	if (det > -eps && det < eps)// This ray is parallel to this triangle.
+		return false;
+	det = 1. / det;
+
+	tvec = orig - v0;
+	u = det * (tvec * pvec);
+	if (u < 0.0 || u > 1.0)
+		return false;
+
+	q = cross(tvec, edge1);
+	v = det * (dir * q);
+	if (v < 0.0 || u + v > 1.0)
+		return false;
+
+	// At this stage we can compute t to find out where the intersection point is on the line.
+	dist = det * (edge2 * q);
+	//IntersectionPoint = rayOrigin + dir * dist;
+	return dist > eps;// This means that there is a line intersection but not a ray intersection.
+}
