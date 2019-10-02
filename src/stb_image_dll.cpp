@@ -3,7 +3,7 @@
 #include <windows.h>
 
 #define STB_API_EXPORTS
-#include "stb_image.h"
+#include "stb_image_release.h"
 
 BOOL APIENTRY DllMain( HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved )
 {
