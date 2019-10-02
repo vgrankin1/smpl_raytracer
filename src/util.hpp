@@ -3,8 +3,9 @@
 #include <vector>
 #include <algorithm>
 #include <mutex>
-#include "geometry.hpp"
 
+#include "geometry.hpp"
+#include "stb_image.h"
 
 union unColor_t
 {
@@ -103,7 +104,7 @@ std::ostream& operator<<(std::ostream& out, Model& m);
 
 
 
-#include "stb_image.h"
+
 
 class envmap_env_t//envelope for env map
 {
@@ -144,25 +145,17 @@ public:
 };
 
 
-#include "SDL2/SDL.h"
 
-struct sdl_window_t
-{
-	SDL_Window* window;
-	SDL_Renderer* renderer;
-	SDL_Event event;
-	SDL_Texture* framebuffer;
-	unsigned int width, height;
-};
+
 
 
 
 struct render_state_t
 {
 	render_state_t()
-		: pwindow(), pixels_cnt(), workers_num(), terminate(false)
+		: width(), height(), pixels_cnt(), workers_num(), terminate(false)
 	{}
-	sdl_window_t* pwindow;
+	unsigned width, height;
 	std::vector<unsigned long long> pixels;	//rendered pixels by render, need to move to framebuffer
 	unsigned int pixels_cnt;				//just count of rendered pixels of current frame
 	int workers_num;

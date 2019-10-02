@@ -10,6 +10,8 @@
 #include "util.hpp"
 #include "geometry.hpp"
 
+#define SDL_MAIN_HANDLED//no SDL_main function
+#include "SDL2/SDL.h"
 
 /*
 /*used when stb is original file
@@ -19,18 +21,21 @@
 
 #if _MSC_VER
 #pragma comment(lib, "SDL2.lib")
-#pragma comment(lib, "SDL2main.lib")
-
 #pragma warning( disable : 26451 )
 #endif
 
-
-//void render(std::vector<unsigned>& framebuffer, const int width, const int height, const unsigned char *envmap, const int env_width, const int env_height);//const std::vector<Vec3f> *envmap
 
 void render2(Scene_t *scene, render_state_t* rstate, const int worker_id);
 
 std::vector<std::thread> r_threads;
 
+struct sdl_window_t
+{
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+	SDL_Event event;
+	SDL_Texture* framebuffer;
+};
 
 class frame_counter_t
 {
@@ -54,29 +59,30 @@ public:
 	}
 };
 
-int main()
+int main(int argc, char* argv[])
 {
 	sdl_window_t mainWindow;
-	mainWindow.width = 800;
-	mainWindow.height = 600;
+	render_state_t r_state;
+	r_state.width = 800;
+	r_state.height = 600;
 
-	std::vector<unsigned> framebuffer((unsigned)mainWindow.width*mainWindow.height);
+	std::vector<unsigned> framebuffer((unsigned)r_state.width* r_state.height);
 	envmap_env_t envmap("envmap.jpg");
 	Scene_t scene(&envmap);
 	frame_counter_t frame_counter;
-	render_state_t render_state1;
-
+	
+	SDL_SetMainReady();
 	if (SDL_Init(SDL_INIT_VIDEO))
 	{
 		std::cerr << "Couldn't initialize SDL: " << SDL_GetError() << std::endl;
 		return -1;
 	}
-	if (SDL_CreateWindowAndRenderer(mainWindow.width, mainWindow.height, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS, &mainWindow.window, &mainWindow.renderer))
+	if (SDL_CreateWindowAndRenderer(r_state.width, r_state.height, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS, &mainWindow.window, &mainWindow.renderer))
 	{
 		std::cerr << "Couldn't create window and renderer: " << SDL_GetError() << std::endl;
 		return -1;
 	}
-	mainWindow.framebuffer = SDL_CreateTexture(mainWindow.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, mainWindow.width, mainWindow.height);
+	mainWindow.framebuffer = SDL_CreateTexture(mainWindow.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, r_state.width, r_state.height);
 
 
 
@@ -104,39 +110,37 @@ int main()
 	Model duck_obj("untitled.obj");//"duck.obj");//
 	scene.objects.push_back(&duck_obj);
 
-	render_state1.pwindow = &mainWindow;
-	render_state1.workers_num = 1;
-	for (int i = 0; i < render_state1.workers_num; i++)
-		r_threads.push_back( std::thread(render2, &scene, &render_state1, i) );
+	//render_state1.pwindow = &mainWindow;
+	r_state.workers_num = 4;
+	for (int i = 0; i < r_state.workers_num; i++)
+		r_threads.push_back( std::thread(render2, &scene, &r_state, i) );
 
 	for (uint64_t frame_cnt = 0; ; )
 	{
-		SDL_PollEvent(&mainWindow.event);
-		if (mainWindow.event.type == SDL_QUIT){
+		SDL_WaitEventTimeout(&mainWindow.event, 34);//34ms time out, leads to 32 fps
+		if (mainWindow.event.type == SDL_QUIT) {
 			break;
 		}
 		frame_counter.frame_begin();
-
-		if (render_state1.mx.try_lock())
+		
+		r_state.mx.lock();
+		for (int i = 0; r_state.pixels.size() != 0 ; i++)
 		{
-			for (int i = 0; render_state1.pixels.size() != 0 ; i++)
-			{
-				unsigned long long packed_pixel = render_state1.pixels.back();
-				render_state1.pixels.pop_back();
-				render_state1.pixels_cnt++;
-				unsigned int pixcolor = packed_pixel & 0xffffffff;
-				unsigned int pixindex = packed_pixel >> 32;
-				framebuffer[pixindex] = pixcolor;
-			}
-			render_state1.mx.unlock();
+			unsigned long long packed_pixel = r_state.pixels.back();
+			r_state.pixels.pop_back();
+			r_state.pixels_cnt++;
+			unsigned int pixcolor = packed_pixel & 0xffffffff;
+			unsigned int pixindex = packed_pixel >> 32;
+			framebuffer[pixindex] = pixcolor;
 		}
-		SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), mainWindow.width * 4);
+		r_state.mx.unlock();
+		SDL_UpdateTexture(mainWindow.framebuffer, NULL, reinterpret_cast<void*>(framebuffer.data()), r_state.width * 4);
 
 			
-		if (render_state1.pixels_cnt >= mainWindow.width * mainWindow.height)
+		if (r_state.pixels_cnt >= r_state.width * r_state.height)
 		{
 			frame_counter.frame++;
-			render_state1.pixels_cnt -= mainWindow.width * mainWindow.height;
+			r_state.pixels_cnt -= r_state.width * r_state.height;
 		}
 	
 		SDL_RenderClear(mainWindow.renderer);
@@ -151,7 +155,7 @@ int main()
 			unsigned frame_cnt = unsigned(frame_counter.frame - frame_counter.frame_last_fps);
 			if (frame_cnt < 1)
 			{
-				fps = double(render_state1.pixels_cnt) / double(mainWindow.width * mainWindow.height * frame_counter.sum_time);
+				fps = double(r_state.pixels_cnt) / double(r_state.width * r_state.height * frame_counter.sum_time);
 			}
 			else
 			{
@@ -168,15 +172,10 @@ int main()
 	SDL_DestroyWindow(mainWindow.window);
 	SDL_Quit();
 
-	render_state1.terminate = true;
+	r_state.terminate = true;
 	for (auto &i : r_threads)
 	{
 		i.join();
 	}
 	return 0;
-}
-
-extern "C" int SDL_main(int argc, char* argv[])
-{
-	return main();
 }

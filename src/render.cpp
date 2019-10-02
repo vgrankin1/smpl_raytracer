@@ -126,13 +126,13 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const Scene_t &scene, size_t
 }
 
 
-const float fov = M_PI / 2.;
+const float fov = M_PI / 3.;
 
 
 void render2(Scene_t *scene, render_state_t *rstate, const int worker_id)
 {
-	unsigned int width = rstate->pwindow->width;
-	unsigned int height = rstate->pwindow->height;
+	unsigned int width = rstate->width;
+	unsigned int height = rstate->height;
 	unsigned prand_seed = 0;
 
 
